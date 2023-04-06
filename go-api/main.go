@@ -2,87 +2,99 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	"strings"
+	"proevilz/api/db"
+	"proevilz/api/models"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
-type Todo struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Completed bool   `json:"completed"`
-}
-
-var todos = []Todo{
-	{ID: uuid.New().String(), Title: "Write presentation", Completed: false},
-	{ID: uuid.New().String(), Title: "Make a cup of tea bruv", Completed: true},
-}
-
 func getTodos(c *gin.Context) {
+	var todos []models.Todo
+	db.DB.Find(&todos)
 	c.IndentedJSON(http.StatusOK, todos)
 }
 
 func updateTodo(c *gin.Context) {
+	type TodoUpdate struct {
+		Title     *string `json:"title"`
+		Completed *bool   `json:"completed"`
+	}
+
 	id := c.Param("id")
+	var todo models.Todo
+	result := db.DB.First(&todo, "id = ?", id)
 
-	updates := make(map[string]interface{})
-	err := json.NewDecoder(c.Request.Body).Decode(&updates)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+		return
+	} else if result.Error != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
 
+	var update TodoUpdate
+	err := c.BindJSON(&update)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	for i, t := range todos {
-		if t.ID == id {
-			updatedTodo := t
-			for key, value := range updates {
-				switch strings.ToLower(key) {
-				case "title":
-					updatedTodo.Title = value.(string)
-				case "completed":
-					updatedTodo.Completed = value.(bool)
-				default:
-					c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "Invalid field(s)"})
-					return
-				}
-			}
-			todos[i] = updatedTodo
-			c.IndentedJSON(http.StatusOK, updatedTodo)
-			return
-		}
+	if update.Title != nil {
+		todo.Title = *update.Title
 	}
+	if update.Completed != nil {
+		todo.Completed = *update.Completed
+	}
+
+	result = db.DB.Updates(&todo)
+	if result.Error != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, todo)
+
 }
 
 func deleteTodo(c *gin.Context) {
 	id := c.Param("id")
-
-	for i, t := range todos {
-		if t.ID == id {
-			todos = append(todos[:i], todos[i+1:]...)
-			c.IndentedJSON(http.StatusOK, gin.H{"message": "Todo deleted"})
-			return
-		}
+	todo := models.Todo{ID: id}
+	result := db.DB.Delete(&todo)
+	if result.Error != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": result.Error})
+		return
 	}
+	c.IndentedJSON(http.StatusNoContent, id)
 }
 
 func createTodo(c *gin.Context) {
-	var todo Todo
+	var todo models.Todo
 	err := json.NewDecoder(c.Request.Body).Decode(&todo)
 
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	todo.ID = uuid.New().String()
-	todos = append(todos, todo)
-	c.IndentedJSON(http.StatusCreated, todo)
+
+	newTodo := models.Todo{ID: uuid.New().String(), Title: todo.Title, Completed: false}
+
+	result := db.DB.Create(&newTodo)
+	if result.Error != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": result.Error})
+		return
+	}
+
+	c.IndentedJSON(http.StatusCreated, newTodo)
 
 }
 func main() {
+
+	db.ConnectDB()
 	router := gin.Default()
 	router.Use(cors.Default())
 	router.GET("/todos", getTodos)

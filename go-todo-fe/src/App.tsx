@@ -56,7 +56,11 @@ export default function App() {
             return todo
         })
         setTodos(newTodos)
-        if (!hasError) {
+    }
+
+    const handleSave = async (id: string) => {
+        const todo = todos.find((todo) => todo.id === id)
+        if (todo && !todo.hasError) {
             try {
                 const request = await fetch(
                     `http://localhost:8080/todos/${id}`,
@@ -66,7 +70,8 @@ export default function App() {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            title: newTitle,
+                            title: todo.title,
+                            completed: todo.completed,
                         }),
                     }
                 )
@@ -164,6 +169,7 @@ export default function App() {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onComplete={handleComplete}
+                            onSave={handleSave}
                         />
                     ))}
                 </Stack>

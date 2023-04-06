@@ -1,13 +1,14 @@
 import { Paper, Flex, Button, Text, TextInput } from '@mantine/core'
 import { IconCheck, IconTrash } from '@tabler/icons-react'
 import { ITodo } from '../Interfaces'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useClickOutside } from '@mantine/hooks'
 
 interface IProps extends ITodo {
     onEdit: (id: string, title: string) => void
     onDelete: (id: string) => void
     onComplete: (id: string) => void
+    onSave: (id: string) => void
 }
 const Todo = ({
     completed,
@@ -17,13 +18,24 @@ const Todo = ({
     onEdit,
     onDelete,
     onComplete,
+    onSave,
 }: IProps) => {
     const [editing, setEditing] = useState<boolean>(false)
+    const [titleLength, setTitleLength] = useState<number>(0)
     const ref = useClickOutside(() => {
-        if (title.trim() !== '') {
+        if (editing && title.trim() !== '') {
             setEditing(false)
         }
     })
+    useEffect(() => {
+        if (editing) {
+            setTitleLength(title.length)
+        } else {
+            if (title.length !== titleLength) {
+                onSave(id)
+            }
+        }
+    }, [editing])
     const inputRef = useRef<HTMLInputElement>(null)
     return (
         <Paper shadow='xs' p='sm' withBorder radius='sm' ref={ref}>
@@ -53,6 +65,7 @@ const Todo = ({
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && title.trim() !== '') {
                                 setEditing(false)
+
                                 inputRef?.current?.blur()
                             }
                         }}
