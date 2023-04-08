@@ -6,6 +6,7 @@ It is a simple todo CRUD API with a React frontend built with Vite and TypeScrip
 ## Running the API
  ```
  $ cd /go-api
+ create a .env file with username, password, host and dbName (all for the database connection)
  $ go run main.go
  ```
 
@@ -16,5 +17,5 @@ It is a simple todo CRUD API with a React frontend built with Vite and TypeScrip
  ```
  
  # Todo
- - Add database support
+ - 	~~Add database support~~ 
  - Write tests
